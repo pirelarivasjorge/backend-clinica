@@ -18,6 +18,9 @@ app.use('/wp-json/appointments/v1', routes);
 // Public health endpoint
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
+// Root welcome endpoint
+app.get('/', (req, res) => res.send('Bienvenido'));
+
 const PORT = process.env.PORT || 3000;
 
 (async () => {
