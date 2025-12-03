@@ -26,6 +26,9 @@ router.get('/doctors/available', getAvailableDoctors);
 router.get('/doctors/search', searchDoctors);
 router.get('/treatments', getTreatments);
 
+// Root welcome route
+router.get('/', (req, res) => res.send('Bienvenido'));
+
 router.post('/add', addAppointment);
 router.delete('/delete/:id', deleteAppointment);
 router.post('/cancel', cancelByPhone);
