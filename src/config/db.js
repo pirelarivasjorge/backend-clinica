@@ -16,7 +16,7 @@ const logSql = (msg) => {
     if (!msg.startsWith('Executing')) return console.log(`\n[Sequelize]: ${msg}`);
 
     const cleanMsg = msg.replace(/^Executing \(.*?\): /, '');
-    const formatted = format(cleanMsg, { language: 'mysql' });
+    const formatted = format(cleanMsg, { language: 'postgresql' });
     console.log(`\n[Consulta]:\n${formatted}`);
   } catch (err) {
     console.warn('\n[Sequelize:raw]', msg); // fallback sin formatear
@@ -26,7 +26,7 @@ const logSql = (msg) => {
 export const sequelize = new Sequelize(DB_NAME, DB_USER, DB_PASSWORD, {
   host: DB_HOST,
   port: Number(DB_PORT),
-  dialect: 'mysql',
+  dialect: 'postgres',
   logging: MODE_ENV === 'development' ? logSql : false,
   define: {
     freezeTableName: true,
