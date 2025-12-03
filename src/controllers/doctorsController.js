@@ -1,5 +1,5 @@
-import { Op, fn, col, where, literal } from 'sequelize';
-import { WpUser, WpUsermeta, BusinessHour } from '../models/index.js';
+import { Op, fn, col, where, literal, QueryTypes } from 'sequelize';
+import { WpUser, WpUsermeta, BusinessHour, sequelize } from '../models/index.js';
 
 export const getDoctors = async (req, res) => {
   try {
@@ -9,31 +9,47 @@ export const getDoctors = async (req, res) => {
       return res.status(400).json({ error: 'invalid_location_id' });
     }
 
-    // Users with role doctor
-    const doctors = await WpUser.findAll({
-      attributes: ['ID', 'display_name'],
-      include: [{
-        model: WpUsermeta,
-        as: 'caps',
-        required: true,
-        where: { meta_key: '7xoht3agf_capabilities', meta_value: { [Op.like]: '%"doctor";b:1%' } },
-        attributes: []
-      }],
-      raw: true
-    });
-
-    let data = doctors.map(d => ({ id: d.ID, name: d.display_name }));
+    // Build and run a combined query: users who have doctor capability
+    // and optionally are present in businesshours for the given location
+    const capabilityPattern = '%"doctor";b:1%';
 
     if (location_id) {
-      // Filter by BusinessHour clin == location_id (stored as text)
-      const bhDocs = await BusinessHour.findAll({
-        attributes: ['doc'],
-        where: { clin: String(location_id) },
-        group: ['doc'],
-        raw: true
+      const sql = `
+        SELECT u."ID", u."display_name"
+        FROM "7xoht3agf_users" AS u
+        WHERE u."ID" IN (
+          SELECT m."user_id" FROM "7xoht3agf_usermeta" AS m
+          WHERE m."meta_value" LIKE :capability
+        ) AND u."ID" IN (
+          SELECT doc FROM "businesshours" bh WHERE bh."clin" = :loc
+        )
+      `;
+
+      const rows = await sequelize.query(sql, {
+        type: QueryTypes.SELECT,
+        replacements: { capability: capabilityPattern, loc: String(location_id) }
       });
-      const allowed = new Set(bhDocs.map(x => String(x.doc)));
-      data = data.filter(d => allowed.has(String(d.id)));
+
+      const data = rows.map(r => ({ id: r.ID, name: r.display_name }));
+      return res.json(data);
+    } else {
+      // No location filter: return all users with doctor capability
+      const sql = `
+        SELECT u."ID", u."display_name"
+        FROM "7xoht3agf_users" AS u
+        WHERE u."ID" IN (
+          SELECT m."user_id" FROM "7xoht3agf_usermeta" AS m
+          WHERE m."meta_value" LIKE :capability
+        )
+      `;
+
+      const rows = await sequelize.query(sql, {
+        type: QueryTypes.SELECT,
+        replacements: { capability: capabilityPattern }
+      });
+
+      const data = rows.map(r => ({ id: r.ID, name: r.display_name }));
+      return res.json(data);
     }
 
     res.json(data);
