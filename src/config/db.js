@@ -10,6 +10,8 @@ const {
   MODE_ENV
 } = process.env;
 
+const { DATABASE_URL } = process.env;
+
 const logSql = (msg) => {
   try {
     // Filtrar solo sentencias SQL reales (ignorando comandos internos o no parseables)
@@ -23,13 +25,28 @@ const logSql = (msg) => {
   }
 };
 
-export const sequelize = new Sequelize(DB_NAME, DB_USER, DB_PASSWORD, {
-  host: DB_HOST,
-  port: Number(DB_PORT),
-  dialect: 'postgres',
-  logging: MODE_ENV === 'development' ? logSql : false,
-  define: {
-    freezeTableName: true,
-    timestamps: false
-  }
-});
+// Allow using a single DATABASE_URL env var (preferred) or individual parts as fallback
+let sequelize;
+if (DATABASE_URL) {
+  sequelize = new Sequelize(DATABASE_URL, {
+    dialect: 'postgres',
+    logging: MODE_ENV === 'development' ? logSql : false,
+    define: {
+      freezeTableName: true,
+      timestamps: false
+    }
+  });
+} else {
+  sequelize = new Sequelize(DB_NAME, DB_USER, DB_PASSWORD, {
+    host: DB_HOST,
+    port: Number(DB_PORT),
+    dialect: 'postgres',
+    logging: MODE_ENV === 'development' ? logSql : false,
+    define: {
+      freezeTableName: true,
+      timestamps: false
+    }
+  });
+}
+
+export { sequelize };
