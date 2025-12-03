@@ -32,13 +32,29 @@ const dbName = DB_NAME || '';
 
 const connectionUri = `postgres://${user}:${pass}@${host}:${port}/${dbName}`;
 
-const sequelize = new Sequelize(connectionUri, {
+// Configure SSL for production DBs (some managed Postgres require SSL)
+const DB_SSL = process.env.DB_SSL || (MODE_ENV && MODE_ENV !== 'development' ? 'true' : 'false');
+const useSsl = DB_SSL === 'true' || DB_SSL === '1' || DB_SSL === 'yes';
+
+const sequelizeOptions = {
   dialect: 'postgres',
   logging: MODE_ENV === 'development' ? logSql : false,
   define: {
     freezeTableName: true,
     timestamps: false
   }
-});
+};
+
+if (useSsl) {
+  // Accept self-signed certificates by default to work with providers like Render/Postgres
+  sequelizeOptions.dialectOptions = {
+    ssl: {
+      require: true,
+      rejectUnauthorized: false
+    }
+  };
+}
+
+const sequelize = new Sequelize(connectionUri, sequelizeOptions);
 
 export { sequelize };
