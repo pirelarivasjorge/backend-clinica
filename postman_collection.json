@@ -1,0 +1,186 @@
+{
+  "info": {
+    "_postman_id": "b1f6d2e1-3f1e-4c7a-9a7f-collection",
+    "name": "Clinica Backend - Chatbot Flows",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Flujo 1 - Discovery",
+      "item": [
+        {
+          "name": "Get Locations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiBase}}/locations"
+            }
+          }
+        },
+        {
+          "name": "Get Doctors by Location",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiBase}}/doctors?location_id={{location_id}}",
+              "query": [
+                { "key": "location_id", "value": "{{location_id}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Calendar Days",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiBase}}/calendar/days?location_id={{location_id}}&doctor_id={{doctor_id}}&from={{date_from}}&days={{days}}&slot={{slot}}",
+              "query": [
+                { "key": "location_id", "value": "{{location_id}}" },
+                { "key": "doctor_id", "value": "{{doctor_id}}" },
+                { "key": "from", "value": "{{date_from}}" },
+                { "key": "days", "value": "{{days}}" },
+                { "key": "slot", "value": "{{slot}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Calendar Slots (By Date)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiBase}}/calendar/slots?location_id={{location_id}}&doctor_id={{doctor_id}}&date={{date}}&slot={{slot}}",
+              "query": [
+                { "key": "location_id", "value": "{{location_id}}" },
+                { "key": "doctor_id", "value": "{{doctor_id}}" },
+                { "key": "date", "value": "{{date}}" },
+                { "key": "slot", "value": "{{slot}}" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Flujo 2 - Book",
+      "item": [
+        {
+          "name": "Upsert Patient",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{phone}}\",\n  \"first_name\": \"{{first_name}}\",\n  \"last_name\": \"{{last_name}}\",\n  \"email\": \"{{email}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{apiBase}}/patient/upsert"
+            }
+          }
+        },
+        {
+          "name": "Create Appointment (Add)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"start_ts\": {{start_ts}},\n  \"end_ts\": {{end_ts}},\n  \"cli\": {{location_id}},\n  \"doc\": {{doctor_id}},\n  \"pat\": {{pat}},\n  \"price\": {{price}}\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{apiBase}}/add"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Flujo 3 - Cancel",
+      "item": [
+        {
+          "name": "Get Patient Appointments (Upcoming)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiBase}}/patient/appointments?phone={{phone}}&only_upcoming=1",
+              "query": [
+                { "key": "phone", "value": "{{phone}}" },
+                { "key": "only_upcoming", "value": "1" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Cancel Appointment by Phone",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{phone}}\",\n  \"appointment_id\": {{appointment_id}}\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{apiBase}}/cancel"
+            }
+          }
+        }
+      ]
+    }
+  ,
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health (Global)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{serverBase}}/health" }
+          }
+        },
+        {
+          "name": "Health (WP-JSON)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{apiBase}}/health" }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "serverBase", "value": "http://localhost:3000" },
+    { "key": "apiBase", "value": "http://localhost:3000/wp-json/appointments/v1" },
+    { "key": "phone", "value": "34600111222" },
+    { "key": "first_name", "value": "Ana" },
+    { "key": "last_name", "value": "Perez" },
+    { "key": "email", "value": "ana@example.com" },
+    { "key": "location_id", "value": "1" },
+    { "key": "doctor_id", "value": "101" },
+    { "key": "date_from", "value": "2025-12-01" },
+    { "key": "days", "value": "14" },
+    { "key": "slot", "value": "30" },
+    { "key": "date", "value": "2025-12-03" },
+    { "key": "start_ts", "value": "1733020200" },
+    { "key": "end_ts", "value": "1733022000" },
+    { "key": "pat", "value": "5334" },
+    { "key": "appointment_id", "value": "6451" },
+    { "key": "price", "value": "0" }
+  ]
+}
