@@ -120,7 +120,14 @@ export const getPatientAppointments = async (req, res) => {
     if (only_upcoming) where.start_ts = { [Op.gte]: nowTs };
 
     const apps = await Appointment.findAll({ where, order: [['start_ts', 'ASC']], raw: true });
-    res.json(apps.map(a => ({ id: a.ID, doctor_id: a.doc, location_id: a.cli, start_ts: a.start_ts, end_ts: a.end_ts })));
+    // Convert numeric fields (often returned as strings by some DB drivers for BIGINT)
+    res.json(apps.map(a => ({
+      id: a.ID != null ? Number(a.ID) : null,
+      doctor_id: a.doc != null ? Number(a.doc) : null,
+      location_id: a.cli != null ? Number(a.cli) : null,
+      start_ts: a.start_ts != null ? Number(a.start_ts) : null,
+      end_ts: a.end_ts != null ? Number(a.end_ts) : null
+    })));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'internal_error' });
