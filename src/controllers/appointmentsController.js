@@ -1,5 +1,5 @@
 import { sequelize, Appointment, Log, Notification, WpPostmeta, BusinessHour } from '../models/index.js';
-import { Op } from 'sequelize';
+import { Op, QueryTypes } from 'sequelize';
 
 export const addAppointment = async (req, res) => {
   try {
@@ -63,17 +63,39 @@ export const addAppointment = async (req, res) => {
 
       // LOCK para evitar doble reserva
       const lockKey = `cn:${cli}:${date}:${shift}:${doc}`;
-      const [lockRow] = await sequelize.query('SELECT GET_LOCK(?, 5) AS got', { replacements: [lockKey] });
-      const got = Array.isArray(lockRow) ? lockRow[0]?.got : lockRow?.got;
+      const dialect = (sequelize.getDialect && sequelize.getDialect()) || (sequelize.options && sequelize.options.dialect) || 'unknown';
+      let got = 0;
+      if (dialect === 'mysql') {
+        const [lockRow] = await sequelize.query('SELECT GET_LOCK(?, 5) AS got', { replacements: [lockKey] });
+        got = Array.isArray(lockRow) ? lockRow[0]?.got : lockRow?.got;
+      } else if (dialect === 'postgres') {
+        // Use pg_try_advisory_lock on hash of the key (hashtext returns int4)
+        const rows = await sequelize.query('SELECT pg_try_advisory_lock(hashtext(?)) AS got', { replacements: [lockKey], type: QueryTypes.SELECT });
+        // rows may be array or object depending on driver
+        if (Array.isArray(rows)) {
+          got = rows[0] && (rows[0].got === true || rows[0].got === 't') ? 1 : 0;
+        } else if (rows && typeof rows.got !== 'undefined') {
+          got = (rows.got === true || rows.got === 't') ? 1 : 0;
+        }
+      } else {
+        // Fallback: try MySQL-style, but may fail
+        try {
+          const [lockRow] = await sequelize.query('SELECT GET_LOCK(?, 5) AS got', { replacements: [lockKey] });
+          got = Array.isArray(lockRow) ? lockRow[0]?.got : lockRow?.got;
+        } catch (e) {
+          console.warn('[DB] unable to acquire lock using dialect', dialect, e.message);
+          got = 1; // allow through to attempt reservation (best-effort)
+        }
+      }
       if (got !== 1 && got !== '1') return res.status(423).json({ error: 'busy' });
       try {
         const overlap = await Appointment.findOne({ where: { doc: Number(doc), cli: Number(cli), active: 1, [Op.not]: { [Op.or]: [ { end_ts: { [Op.lte]: chosen } }, { start_ts: { [Op.gte]: chosenEnd } } ] } }, raw: true });
         if (overlap) return res.status(409).json({ error: 'overlap' });
-        // appid incremental
+        // appid incremental (dialect-agnostic)
         let appidVal = appid || null;
         if (!appidVal) {
-          const [rows] = await sequelize.query('SELECT IFNULL(MAX(appid),0)+1 AS next FROM `appointments`');
-          appidVal = Number((rows && rows[0] && rows[0].next) || 1);
+          const maxAppid = await Appointment.max('appid');
+          appidVal = Number(maxAppid || 0) + 1;
         }
         const rec = await Appointment.create({ appid: appidVal, start_ts: chosen, end_ts: chosenEnd, price: price ? n(price) : 0, cli: Number(cli), clin: '', app_datetime: new Date(), doc: Number(doc), docn: '', treat: treat ? n(treat) : 0, treatn: '', pat: Number(pat), patn: '', paid: 0, active: 1, parent: 0 });
         try {
@@ -82,7 +104,16 @@ export const addAppointment = async (req, res) => {
         } catch {}
         return res.status(201).json({ id: rec.ID, start_ts: chosen, end_ts: chosenEnd });
       } finally {
-        await sequelize.query('DO RELEASE_LOCK(?)', { replacements: [lockKey] }).catch(()=>{});
+        try {
+          if (dialect === 'mysql') {
+            await sequelize.query('SELECT RELEASE_LOCK(?)', { replacements: [lockKey] }).catch(()=>{});
+          } else if (dialect === 'postgres') {
+            await sequelize.query('SELECT pg_advisory_unlock(hashtext(?))', { replacements: [lockKey] }).catch(()=>{});
+          } else {
+            // best-effort: try MySQL release
+            await sequelize.query('SELECT RELEASE_LOCK(?)', { replacements: [lockKey] }).catch(()=>{});
+          }
+        } catch (_) {}
       }
     }
 
@@ -111,8 +142,8 @@ export const addAppointment = async (req, res) => {
 
     let appidVal = appid || null;
     if (!appidVal) {
-      const [rows] = await sequelize.query('SELECT IFNULL(MAX(appid),0)+1 AS next FROM `appointments`');
-      appidVal = Number((rows && rows[0] && rows[0].next) || 1);
+      const maxAppid = await Appointment.max('appid');
+      appidVal = Number(maxAppid || 0) + 1;
     }
 
     const rec = await Appointment.create({
