@@ -97,7 +97,10 @@ export const addAppointment = async (req, res) => {
           const maxAppid = await Appointment.max('appid');
           appidVal = Number(maxAppid || 0) + 1;
         }
-        const rec = await Appointment.create({ appid: appidVal, start_ts: chosen, end_ts: chosenEnd, price: price ? n(price) : 0, cli: Number(cli), clin: '', app_datetime: new Date(), doc: Number(doc), docn: '', treat: treat ? n(treat) : 0, treatn: '', pat: Number(pat), patn: '', paid: 0, active: 1, parent: 0 });
+        // Ensure unique primary ID in DBs without proper serial/sequence defaults
+        let nextId = await Appointment.max('ID');
+        nextId = Number(nextId || 0) + 1;
+        const rec = await Appointment.create({ ID: nextId, appid: appidVal, start_ts: chosen, end_ts: chosenEnd, price: price ? n(price) : 0, cli: Number(cli), clin: '', app_datetime: new Date(), doc: Number(doc), docn: '', treat: treat ? n(treat) : 0, treatn: '', pat: Number(pat), patn: '', paid: 0, active: 1, parent: 0 });
         try {
           await Log.create({ msg: 'appointment_created', uid: pat, data: JSON.stringify({ appointment_id: rec.ID, doc, cli, start_ts: chosen, end_ts: chosenEnd }) });
           await Notification.create({ itemid: rec.ID, type: 'appointment_created', not_datetime: new Date(), availto: JSON.stringify(['doctor','patient']), availtoid: JSON.stringify([Number(doc), Number(pat)]), readby: JSON.stringify([]), data: JSON.stringify({ cli, start_ts: chosen, end_ts: chosenEnd }) });
@@ -146,7 +149,11 @@ export const addAppointment = async (req, res) => {
       appidVal = Number(maxAppid || 0) + 1;
     }
 
+    // Ensure unique primary ID when DB doesn't provide serial defaults
+    let nextId2 = await Appointment.max('ID');
+    nextId2 = Number(nextId2 || 0) + 1;
     const rec = await Appointment.create({
+      ID: nextId2,
       appid: appidVal,
       start_ts: n(start_ts),
       end_ts: n(end_ts),
