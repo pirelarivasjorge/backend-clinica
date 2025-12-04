@@ -323,16 +323,37 @@ export const cancelByPhone = async (req, res) => {
     console.log('[cancelByPhone] Cancelling appointment:', appt.ID);
     await Appointment.update({ active: 0 }, { where: { ID: appt.ID } });
 
-    await Log.create({ msg: 'appointment_canceled_by_phone', uid: appt.pat, data: JSON.stringify({ appointment_id: appt.ID, phone }) });
-    await Notification.create({
-      itemid: appt.ID,
-      type: 'appointment_canceled',
-      not_datetime: new Date(),
-      availto: JSON.stringify(['doctor', 'patient']),
-      availtoid: JSON.stringify([Number(appt.doc), Number(appt.pat)]),
-      readby: JSON.stringify([]),
-      data: JSON.stringify({ cli: appt.cli, phone })
-    });
+    // Non-critical side effects (Logs & Notifications)
+    // Wrapped in try-catch to prevent request failure if logging fails (e.g. sequence issues)
+    try {
+      // Manually calculate next ID to avoid sequence sync issues
+      const maxLogId = await Log.max('ID');
+      const nextLogId = Number(maxLogId || 0) + 1;
+
+      await Log.create({
+        ID: nextLogId,
+        msg: 'appointment_canceled_by_phone',
+        uid: appt.pat,
+        data: JSON.stringify({ appointment_id: appt.ID, phone })
+      });
+
+      const maxNotId = await Notification.max('ID');
+      const nextNotId = Number(maxNotId || 0) + 1;
+
+      await Notification.create({
+        ID: nextNotId,
+        itemid: appt.ID,
+        type: 'appointment_canceled',
+        not_datetime: new Date(),
+        availto: JSON.stringify(['doctor', 'patient']),
+        availtoid: JSON.stringify([Number(appt.doc), Number(appt.pat)]),
+        readby: JSON.stringify([]),
+        data: JSON.stringify({ cli: appt.cli, phone })
+      });
+    } catch (sideEffectErr) {
+      console.error('[cancelByPhone] Warning: Failed to create log/notification:', sideEffectErr);
+      // We do not throw here, so the user still gets a success response for the cancellation
+    }
 
     console.log('[cancelByPhone] Success');
     res.json({ ok: true, message: 'Appointment cancelled successfully' });
