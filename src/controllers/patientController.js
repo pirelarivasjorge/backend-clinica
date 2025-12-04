@@ -70,8 +70,9 @@ export const upsertPatient = async (req, res) => {
         created = false;
       } else {
         // Create new WP user with explicit ID to support DBs without AUTO_INCREMENT
-        const [rows] = await sequelize.query('SELECT IFNULL(MAX(ID),0)+1 AS next FROM `7xoht3agf_users`', { transaction: t });
-        const nextId = Number((rows && rows[0] && rows[0].next) || 1);
+        // Use Sequelize aggregate method (dialect-agnostic) to get current max ID
+        const maxId = await WpUser.max('ID', { transaction: t });
+        const nextId = Number(maxId || 0) + 1;
         const display_name = [first_name, last_name].filter(Boolean).join(' ').trim() || `WA ${normalized}`;
         user = await WpUser.create({
           ID: nextId,
