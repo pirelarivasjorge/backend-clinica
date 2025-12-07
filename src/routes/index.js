@@ -1,6 +1,6 @@
 import express from 'express';
 import { getLocations } from '../controllers/locationsController.js';
-import { getDoctors } from '../controllers/doctorsController.js';
+import { getDoctors, getDoctorsByTreatment } from '../controllers/doctorsController.js';
 import { getSlots } from '../controllers/slotsController.js';
 import { getPatientByPhone, upsertPatient, getPatientAppointments } from '../controllers/patientController.js';
 import { addAppointment, deleteAppointment, cancelByPhone } from '../controllers/appointmentsController.js';
@@ -12,6 +12,7 @@ const router = express.Router();
 
 router.get('/locations', getLocations);
 router.get('/doctors', getDoctors);
+router.get('/doctors/by-treatment', getDoctorsByTreatment);
 router.get('/slots', getSlots);
 router.get('/patient', getPatientByPhone);
 router.post('/patient/upsert', upsertPatient);

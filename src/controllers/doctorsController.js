@@ -58,3 +58,49 @@ export const getDoctors = async (req, res) => {
     res.status(500).json({ error: 'internal_error' });
   }
 };
+
+export const getDoctorsByTreatment = async (req, res) => {
+  try {
+    const { treatment_id } = req.query;
+
+    if (!treatment_id || !/^\d+$/.test(treatment_id)) {
+      return res.status(400).json({ error: 'invalid_treatment_id' });
+    }
+
+    const sql = `
+      SELECT 
+        d."ID" AS doctor_id,
+        d."post_title" AS doctor_name
+      FROM 
+        "7xoht3agf_posts" AS d
+      INNER JOIN 
+        "7xoht3agf_postmeta" AS pm 
+        ON d."ID" = pm."post_id"
+      WHERE 
+        d."post_type" = 'doctor' 
+        AND d."post_status" = 'publish'
+        AND pm."meta_key" = 'treatments'
+        AND (
+            pm."meta_value" = :tid 
+            OR pm."meta_value" LIKE :pattern1 
+            OR pm."meta_value" LIKE :pattern2 
+            OR pm."meta_value" LIKE :pattern3
+        )
+    `;
+
+    const rows = await sequelize.query(sql, {
+      type: QueryTypes.SELECT,
+      replacements: {
+        tid: treatment_id,
+        pattern1: `%,${treatment_id},%`,
+        pattern2: `${treatment_id},%`,
+        pattern3: `%,${treatment_id}`
+      }
+    });
+
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'internal_error' });
+  }
+};
