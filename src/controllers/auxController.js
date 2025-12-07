@@ -24,20 +24,44 @@ export const searchDoctors = async (req, res) => {
 
 export const getTreatments = async (req, res) => {
   try {
-    // Optional clinic filter: ?clinic_id=123
-    const clinicId = req.query.clinic_id || req.query.clin || req.query.location_id || null;
-    if (clinicId) {
-      // find postmeta for that clinic that lists treatments (comma-separated ids)
-      const pm = await WpPostmeta.findOne({ where: { post_id: Number(clinicId), meta_key: 'treatments' }, raw: true });
+    // Filters: ?id_location=99 & ?id_doctor=123
+    const locId = req.query.id_location || req.query.clinic_id || req.query.clin || req.query.location_id || null;
+    const docId = req.query.id_doctor || null;
+
+    let allowedIds = null; // null means "all allowed" so far
+
+    // 1. Filter by Location (using postmeta 'treatments')
+    if (locId) {
+      const pm = await WpPostmeta.findOne({ where: { post_id: Number(locId), meta_key: 'treatments' }, raw: true });
       if (!pm || !pm.meta_value) return res.json([]);
-      const ids = String(pm.meta_value).split(',').map(s => Number(s.trim())).filter(Boolean);
-      if (!ids.length) return res.json([]);
-      const rows = await WpPost.findAll({ where: { ID: ids, post_type: 'treatment', post_status: 'publish' }, attributes: ['ID', 'post_title'], raw: true });
-      return res.json(rows.map(r => ({ id: r.ID, name: r.post_title })));
+      const locTreats = String(pm.meta_value).split(',').map(s => Number(s.trim())).filter(Boolean);
+      allowedIds = locTreats;
     }
 
-    // Basic listing of CPT 'treatment' (no clinic filter)
-    const rows = await WpPost.findAll({ where: { post_type: 'treatment', post_status: 'publish' }, attributes: ['ID', 'post_title'], raw: true });
+    // 2. Filter by Doctor (using usermeta 'treatments')
+    if (docId) {
+      const um = await WpUsermeta.findOne({ where: { user_id: Number(docId), meta_key: 'treatments' }, raw: true });
+      if (!um || !um.meta_value) return res.json([]);
+      const docTreats = String(um.meta_value).split(',').map(s => Number(s.trim())).filter(Boolean);
+
+      if (allowedIds === null) {
+        allowedIds = docTreats;
+      } else {
+        // Intersect
+        allowedIds = allowedIds.filter(id => docTreats.includes(id));
+      }
+    }
+
+    // If we have filters but no matching IDs
+    if (allowedIds !== null && allowedIds.length === 0) return res.json([]);
+
+    // Query WpPost
+    const whereClause = { post_type: 'treatment', post_status: 'publish' };
+    if (allowedIds !== null) {
+      whereClause.ID = allowedIds;
+    }
+
+    const rows = await WpPost.findAll({ where: whereClause, attributes: ['ID', 'post_title'], raw: true });
     res.json(rows.map(r => ({ id: r.ID, name: r.post_title })));
   } catch (err) {
     console.error(err);
@@ -54,7 +78,7 @@ export const addLog = async (req, res) => {
       const um = await WpUsermeta.findOne({ where: { meta_key: 'mobile', meta_value: normalized }, raw: true });
       if (um) uid = Number(um.user_id);
     }
-await Log.create({ msg: event || 'bot_event', uid, data: JSON.stringify(data || {}) });
+    await Log.create({ msg: event || 'bot_event', uid, data: JSON.stringify(data || {}) });
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
